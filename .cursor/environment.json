@@ -1,0 +1,11 @@
+{
+  "name": "ProjectPulse",
+  "install": "cd extension && npm ci && npm run build",
+  "terminals": [
+    {
+      "name": "vite-watch",
+      "command": "cd extension && npm run dev",
+      "description": "Rebuilds extension/dist on source changes (vite build --watch). After it rebuilds, reload the unpacked extension from extension/dist in chrome://extensions."
+    }
+  ]
+}
