@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ProjectPulse</title>
+    <link rel="stylesheet" href="./popup.css" />
+  </head>
+  <body>
+    <header class="header">
+      <h1>ProjectPulse</h1>
+      <span class="badge" id="event-count">0 events</span>
+    </header>
+
+    <div class="toolbar">
+      <button type="button" id="refresh-btn" title="Refresh">↻</button>
+      <button type="button" id="clear-btn" title="Clear all events">Clear</button>
+    </div>
+
+    <div id="status" class="status hidden"></div>
+
+    <main>
+      <ul id="event-list" class="event-list"></ul>
+      <p id="empty-state" class="empty-state">
+        No activity captured yet. Open a Colab notebook and edit or run cells.
+      </p>
+    </main>
+
+    <footer class="footer">
+      <a href="#" id="options-link">Settings</a>
+    </footer>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
