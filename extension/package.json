@@ -1,6 +1,6 @@
 {
   "name": "projectpulse",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Automatically track ML project progress in Colab and GitHub",
   "type": "module",

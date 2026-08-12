@@ -1,15 +1,19 @@
-import type { PulseEvent, ProjectMapping, StorageSchema } from "./types";
+import type { PulseEvent, Project, ProjectMapping, StorageSchema } from "./types";
 import {
   DEFAULT_PROJECT_MAPPINGS,
   DEFAULT_SETTINGS,
 } from "./types";
+import { generateId } from "./uuid";
 
 const STORAGE_KEY = "projectpulse_data";
 const DB_NAME = "projectpulse";
 const DB_VERSION = 1;
 const BLOB_STORE = "blobs";
 
-type StoredData = Pick<StorageSchema, "events" | "projects" | "projectMappings" | "settings">;
+type StoredData = Pick<
+  StorageSchema,
+  "events" | "projectRecords" | "projectMappings" | "settings"
+>;
 
 async function getDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -45,15 +49,26 @@ export async function getBlob(id: string): Promise<string | null> {
   });
 }
 
+function migrateData(raw: Partial<StoredData> | undefined): StoredData {
+  const events = (raw?.events ?? []).map((e) => {
+    const ev = e as PulseEvent & { projectId?: string };
+    return {
+      ...ev,
+      projectId: ev.projectId ?? ev.project ?? "legacy",
+    };
+  });
+
+  return {
+    events,
+    projectRecords: raw?.projectRecords ?? [],
+    projectMappings: raw?.projectMappings ?? { ...DEFAULT_PROJECT_MAPPINGS },
+    settings: { ...DEFAULT_SETTINGS, ...raw?.settings },
+  };
+}
+
 async function readData(): Promise<StoredData> {
   const result = await chrome.storage.local.get(STORAGE_KEY);
-  const data = result[STORAGE_KEY] as StoredData | undefined;
-  return {
-    events: data?.events ?? [],
-    projects: data?.projects ?? [],
-    projectMappings: data?.projectMappings ?? { ...DEFAULT_PROJECT_MAPPINGS },
-    settings: { ...DEFAULT_SETTINGS, ...data?.settings },
-  };
+  return migrateData(result[STORAGE_KEY] as Partial<StoredData> | undefined);
 }
 
 async function writeData(data: StoredData): Promise<void> {
@@ -80,10 +95,6 @@ export function resolveProjectName(
 export async function addEvent(event: PulseEvent): Promise<void> {
   const data = await readData();
   data.events.unshift(event);
-  if (!data.projects.includes(event.project)) {
-    data.projects.push(event.project);
-  }
-  // Keep last 5000 events to avoid quota issues
   if (data.events.length > 5000) {
     data.events = data.events.slice(0, 5000);
   }
@@ -95,15 +106,101 @@ export async function getEvents(): Promise<PulseEvent[]> {
   return data.events;
 }
 
-export async function getProjects(): Promise<string[]> {
+export async function getEventsForProject(projectId: string): Promise<PulseEvent[]> {
+  const events = await getEvents();
+  return events.filter((e) => e.projectId === projectId);
+}
+
+export async function getProjectRecords(): Promise<Project[]> {
   const data = await readData();
-  return data.projects;
+  return data.projectRecords;
+}
+
+export async function getActiveProjects(): Promise<Project[]> {
+  const records = await getProjectRecords();
+  return records.filter((p) => p.status === "active");
+}
+
+export async function getProjectById(id: string): Promise<Project | undefined> {
+  const records = await getProjectRecords();
+  return records.find((p) => p.id === id);
+}
+
+export async function createProject(input: {
+  name: string;
+  type?: string;
+  trackedTabIds: number[];
+  autoTrackColabGithub: boolean;
+}): Promise<Project> {
+  const data = await readData();
+  const project: Project = {
+    id: generateId(),
+    name: input.name.trim(),
+    type: input.type?.trim() || undefined,
+    status: "active",
+    startDate: Date.now(),
+    trackedTabIds: [...input.trackedTabIds],
+    autoTrackColabGithub: input.autoTrackColabGithub,
+  };
+  data.projectRecords.unshift(project);
+  await writeData(data);
+  return project;
+}
+
+export async function endProject(projectId: string): Promise<Project | null> {
+  const data = await readData();
+  const idx = data.projectRecords.findIndex((p) => p.id === projectId);
+  if (idx === -1) return null;
+  data.projectRecords[idx] = {
+    ...data.projectRecords[idx],
+    status: "ended",
+    endDate: Date.now(),
+  };
+  await writeData(data);
+  return data.projectRecords[idx];
+}
+
+export async function updateProject(
+  projectId: string,
+  updates: Partial<Pick<Project, "trackedTabIds" | "autoTrackColabGithub" | "type" | "name">>
+): Promise<Project | null> {
+  const data = await readData();
+  const idx = data.projectRecords.findIndex((p) => p.id === projectId);
+  if (idx === -1) return null;
+  data.projectRecords[idx] = { ...data.projectRecords[idx], ...updates };
+  await writeData(data);
+  return data.projectRecords[idx];
+}
+
+export function isTrackableUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    return host === "colab.research.google.com" || host === "github.com";
+  } catch {
+    return false;
+  }
+}
+
+export function resolveProjectForTab(
+  projects: Project[],
+  tabId: number,
+  url: string
+): Project | null {
+  const active = projects.filter((p) => p.status === "active");
+  const byTab = active.find((p) => p.trackedTabIds.includes(tabId));
+  if (byTab) return byTab;
+
+  if (!isTrackableUrl(url)) return null;
+
+  const autoProjects = active
+    .filter((p) => p.autoTrackColabGithub)
+    .sort((a, b) => b.startDate - a.startDate);
+  return autoProjects[0] ?? null;
 }
 
 export async function clearEvents(): Promise<void> {
   const data = await readData();
   data.events = [];
-  data.projects = [];
   await writeData(data);
 }
 
@@ -146,4 +243,8 @@ export async function saveProjectMappings(
     },
   };
   await writeData(data);
+}
+
+export async function getAllData(): Promise<StoredData> {
+  return readData();
 }

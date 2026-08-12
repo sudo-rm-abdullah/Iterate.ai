@@ -1,85 +1,48 @@
 /**
- * ProjectPulse — Colab content script (Phase 2)
- *
- * Detects notebook identity, watches code cells for edits and execution output,
- * and sends raw capture events to the background service worker.
+ * ProjectPulse — Colab content script
+ * Tracks only hyperparameter changes and metric/error outputs.
  */
+
+import {
+  extractParams,
+  extractMetrics,
+  diffParams,
+  hasParamChanges,
+  hasMeaningfulMetrics,
+  isErrorOutput,
+  summarizeParamChange,
+  summarizeMetrics,
+  compareMetrics,
+} from "../lib/extract";
 
 const LOG_PREFIX = "[ProjectPulse:Colab]";
 
 interface CellState {
   id: string;
   lastText: string;
+  lastParams: Record<string, string>;
   lastOutputHash: string;
+  lastMetrics: Record<string, string>;
   observer: MutationObserver | null;
 }
 
 const cellStates = new Map<string, CellState>();
-let notebookTitle = "Untitled Notebook";
-let titleObserver: MutationObserver | null = null;
+let trackingEnabled = false;
+let projectName = "";
 let bodyObserver: MutationObserver | null = null;
 
-// ---------------------------------------------------------------------------
-// Notebook identity
-// ---------------------------------------------------------------------------
-
-function detectNotebookTitle(): string {
-  const filenameInput = document.querySelector<HTMLInputElement>(
-    "input#filename-input, input.filename-input, colab-toolbar-button[aria-label*='Rename'] + input"
-  );
-  if (filenameInput?.value?.trim()) {
-    return filenameInput.value.trim();
-  }
-
-  const titleEl = document.querySelector<HTMLElement>(
-    ".notebook-name, #notebook-name, [data-testid='notebook-title']"
-  );
-  if (titleEl?.textContent?.trim()) {
-    return titleEl.textContent.trim();
-  }
-
-  const docTitle = document.title
-    .replace(/\s*-\s*Colab.*$/i, "")
-    .replace(/\.ipynb$/i, "")
-    .trim();
-  if (docTitle && docTitle !== "Google Colaboratory") {
-    return docTitle;
-  }
-
-  return "Untitled Notebook";
-}
-
-function refreshNotebookTitle(): void {
-  const next = detectNotebookTitle();
-  if (next !== notebookTitle) {
-    console.log(LOG_PREFIX, "Notebook title:", next);
-    notebookTitle = next;
+async function checkTracking(): Promise<void> {
+  try {
+    const res = await chrome.runtime.sendMessage({ type: "CHECK_TRACKING" });
+    trackingEnabled = !!res?.shouldTrack;
+    projectName = res?.projectName ?? "";
+    if (trackingEnabled) {
+      console.log(LOG_PREFIX, "Tracking active for project:", projectName);
+    }
+  } catch {
+    trackingEnabled = false;
   }
 }
-
-function watchNotebookTitle(): void {
-  refreshNotebookTitle();
-
-  titleObserver?.disconnect();
-  titleObserver = new MutationObserver(() => refreshNotebookTitle());
-  titleObserver.observe(document.body, {
-    childList: true,
-    subtree: true,
-    characterData: true,
-    attributes: true,
-    attributeFilter: ["value", "aria-label"],
-  });
-
-  const filenameInput = document.querySelector("input#filename-input");
-  if (filenameInput) {
-    filenameInput.addEventListener("change", refreshNotebookTitle);
-    filenameInput.addEventListener("input", refreshNotebookTitle);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Cell text extraction (Colab uses Monaco editor)
-// ---------------------------------------------------------------------------
 
 function getCellId(cell: Element): string {
   const id = cell.getAttribute("id") ?? cell.getAttribute("data-cell-id");
@@ -95,13 +58,10 @@ function extractCellText(cell: Element): string {
       .map((line) => line.textContent ?? "")
       .join("\n");
   }
-
   const textarea = cell.querySelector("textarea");
   if (textarea) return textarea.value;
-
   const codeEl = cell.querySelector(".input_area pre, .code_input, .CodeMirror-code");
   if (codeEl) return codeEl.textContent ?? "";
-
   return "";
 }
 
@@ -116,150 +76,127 @@ function hashText(text: string): string {
 
 function extractCellOutput(cell: Element): string {
   const parts: string[] = [];
-
-  const textOutputs = cell.querySelectorAll(
-    ".output_text, .output_stderr, .output_error, pre"
-  );
-  textOutputs.forEach((el) => {
+  cell.querySelectorAll(".output_text, .output_stderr, .output_error, pre").forEach((el) => {
     const text = el.textContent?.trim();
     if (text) parts.push(text);
   });
-
-  const imgAlts = cell.querySelectorAll(".output_area img");
-  imgAlts.forEach((img) => {
-    parts.push(`[image: ${img.getAttribute("src")?.slice(0, 80) ?? "plot"}]`);
-  });
-
   return parts.join("\n").slice(0, 4000);
 }
 
-function isErrorOutput(output: string): boolean {
-  return /error|exception|traceback|errno/i.test(output);
-}
-
-// ---------------------------------------------------------------------------
-// Diff helpers
-// ---------------------------------------------------------------------------
-
-function computeLineDiff(before: string, after: string): string {
-  if (before === after) return "";
-  const beforeLines = before.split("\n");
-  const afterLines = after.split("\n");
-
-  const removed = beforeLines.filter((l) => !afterLines.includes(l));
-  const added = afterLines.filter((l) => !beforeLines.includes(l));
-
-  const chunks: string[] = [];
-  if (removed.length) chunks.push(`- ${removed.join("\n- ")}`);
-  if (added.length) chunks.push(`+ ${added.join("\n+ ")}`);
-  return chunks.join("\n").slice(0, 8000);
-}
-
-function summarizeEdit(before: string, after: string): string {
-  const diff = computeLineDiff(before, after);
-  const preview = diff.split("\n").slice(0, 3).join(" | ");
-  return preview || "Code cell edited";
-}
-
-// ---------------------------------------------------------------------------
-// Event dispatch
-// ---------------------------------------------------------------------------
-
 async function sendCapture(payload: {
-  eventType: "raw" | "output_change" | "error";
+  eventType: "param_change" | "output_change" | "error";
   summary: string;
+  paramsBefore?: Record<string, unknown> | null;
+  paramsAfter?: Record<string, unknown> | null;
+  metricsBefore?: Record<string, unknown> | null;
+  metricsAfter?: Record<string, unknown> | null;
   rawDiff?: string;
 }): Promise<void> {
+  if (!trackingEnabled) return;
   try {
     const response = await chrome.runtime.sendMessage({
       type: "PULSE_CAPTURE",
       payload: {
         source: "colab",
-        project: notebookTitle,
-        eventType: payload.eventType,
-        summary: payload.summary,
-        paramsBefore: null,
-        paramsAfter: null,
-        metricsBefore: null,
-        metricsAfter: null,
+        project: projectName,
+        ...payload,
         rawDiff: payload.rawDiff ?? null,
       },
     });
-    if (!response?.ok) {
-      console.warn(LOG_PREFIX, "Capture failed:", response?.error);
+    if (!response?.ok && response?.event === undefined) {
+      // null event = not tracking — silent
+      if (response?.error) console.warn(LOG_PREFIX, response.error);
     }
   } catch (err) {
     console.warn(LOG_PREFIX, "sendMessage error:", err);
   }
 }
 
-// ---------------------------------------------------------------------------
-// Per-cell observation
-// ---------------------------------------------------------------------------
-
 function handleCellTextChange(cellId: string, newText: string): void {
   const state = cellStates.get(cellId);
-  if (!state) return;
+  if (!state || !trackingEnabled) return;
 
   const before = state.lastText;
   if (before === newText) return;
 
-  const diff = computeLineDiff(before, newText);
+  const paramsBefore = extractParams(before);
+  const paramsAfter = extractParams(newText);
+  const { changed, paramsBefore: pb, paramsAfter: pa } = diffParams(
+    paramsBefore,
+    paramsAfter
+  );
+
   state.lastText = newText;
+  state.lastParams = paramsAfter;
 
-  if (!before && !newText.trim()) return;
+  if (!hasParamChanges(changed)) return;
 
-  console.log(LOG_PREFIX, "Cell edit:", cellId);
+  const summary = summarizeParamChange(changed);
+  console.log(LOG_PREFIX, "Param change:", summary);
+
   sendCapture({
-    eventType: "raw",
-    summary: `Cell edited: ${summarizeEdit(before, newText)}`,
-    rawDiff: diff || undefined,
+    eventType: "param_change",
+    summary,
+    paramsBefore: pb,
+    paramsAfter: pa,
+    rawDiff: summary,
   });
 }
 
 function handleCellOutputChange(cellId: string, cell: Element): void {
   const state = cellStates.get(cellId);
-  if (!state) return;
+  if (!state || !trackingEnabled) return;
 
   const output = extractCellOutput(cell);
   const hash = hashText(output);
-  if (hash === state.lastOutputHash) return;
+  if (hash === state.lastOutputHash || !output.trim()) return;
 
-  const hadOutput = state.lastOutputHash !== "";
   state.lastOutputHash = hash;
 
-  if (!output.trim()) return;
+  if (isErrorOutput(output)) {
+    const preview = output.replace(/\s+/g, " ").slice(0, 120);
+    sendCapture({
+      eventType: "error",
+      summary: `Error: ${preview}`,
+      rawDiff: output.slice(0, 4000),
+    });
+    return;
+  }
 
-  const isError = isErrorOutput(output);
-  const preview = output.replace(/\s+/g, " ").slice(0, 120);
+  const metrics = extractMetrics(output);
+  if (!hasMeaningfulMetrics(metrics)) return;
 
-  console.log(LOG_PREFIX, isError ? "Cell error:" : "Cell output:", cellId);
+  const prevMetrics = { ...state.lastMetrics };
+  const comparison = compareMetrics(prevMetrics, metrics);
+  state.lastMetrics = metrics;
+
   sendCapture({
-    eventType: isError ? "error" : "output_change",
-    summary: isError
-      ? `Execution error in ${cellId}: ${preview}`
-      : `Cell output in ${cellId}: ${preview}`,
-    rawDiff: output.slice(0, 8000),
+    eventType: "output_change",
+    summary: comparison || summarizeMetrics(metrics),
+    metricsBefore: Object.keys(prevMetrics).length ? prevMetrics : null,
+    metricsAfter: metrics,
+    rawDiff: output.slice(0, 4000),
   });
-
-  void hadOutput; // future: compare metrics before/after in Phase 3
 }
 
 function observeCell(cell: Element): void {
   const cellId = getCellId(cell);
   if (cellStates.has(cellId)) return;
 
+  const text = extractCellText(cell);
   const state: CellState = {
     id: cellId,
-    lastText: extractCellText(cell),
+    lastText: text,
+    lastParams: extractParams(text),
     lastOutputHash: hashText(extractCellOutput(cell)),
+    lastMetrics: extractMetrics(extractCellOutput(cell)),
     observer: null,
   };
   cellStates.set(cellId, state);
 
   const observer = new MutationObserver(() => {
-    const newText = extractCellText(cell);
-    handleCellTextChange(cellId, newText);
+    if (!trackingEnabled) return;
+    handleCellTextChange(cellId, extractCellText(cell));
     handleCellOutputChange(cellId, cell);
   });
 
@@ -270,18 +207,10 @@ function observeCell(cell: Element): void {
     characterData: true,
     attributes: true,
   });
-
-  console.log(LOG_PREFIX, "Watching cell:", cellId);
 }
 
 function findCodeCells(): Element[] {
-  const selectors = [
-    ".codecell",
-    ".cell.code",
-    "colab-cell[cell-type='code']",
-    "[data-cell-type='code']",
-  ];
-  for (const sel of selectors) {
+  for (const sel of [".codecell", ".cell.code", "colab-cell[cell-type='code']", "[data-cell-type='code']"]) {
     const cells = Array.from(document.querySelectorAll(sel));
     if (cells.length > 0) return cells;
   }
@@ -289,44 +218,45 @@ function findCodeCells(): Element[] {
 }
 
 function scanForCells(): void {
-  const cells = findCodeCells();
-  cells.forEach(observeCell);
+  findCodeCells().forEach(observeCell);
 }
 
 function watchForNewCells(): void {
   bodyObserver?.disconnect();
   bodyObserver = new MutationObserver((mutations) => {
-    let shouldScan = false;
-    for (const mutation of mutations) {
-      if (mutation.addedNodes.length > 0) {
-        shouldScan = true;
-        break;
-      }
-    }
-    if (shouldScan) scanForCells();
+    if (mutations.some((m) => m.addedNodes.length > 0)) scanForCells();
   });
-
   bodyObserver.observe(document.body, { childList: true, subtree: true });
 }
 
-// ---------------------------------------------------------------------------
-// Init
-// ---------------------------------------------------------------------------
-
-function init(): void {
+async function init(): Promise<void> {
   if (window.location.hostname !== "colab.research.google.com") return;
 
-  console.log(LOG_PREFIX, "Initializing on", window.location.href);
-  watchNotebookTitle();
-  scanForCells();
-  watchForNewCells();
+  await checkTracking();
+  setInterval(checkTracking, 10_000);
 
-  // Re-scan periodically — Colab lazy-loads cells
-  setInterval(scanForCells, 5000);
+  if (trackingEnabled) {
+    scanForCells();
+    watchForNewCells();
+    setInterval(scanForCells, 5000);
+  } else {
+    // Re-init when tracking becomes active
+    const poll = setInterval(async () => {
+      await checkTracking();
+      if (trackingEnabled) {
+        clearInterval(poll);
+        scanForCells();
+        watchForNewCells();
+        setInterval(scanForCells, 5000);
+      }
+    }, 3000);
+  }
+
+  console.log(LOG_PREFIX, "Initialized, tracking:", trackingEnabled);
 }
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", init);
+  document.addEventListener("DOMContentLoaded", () => init());
 } else {
   init();
 }

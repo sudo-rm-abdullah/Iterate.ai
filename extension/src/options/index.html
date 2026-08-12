@@ -4,47 +4,27 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ProjectPulse Settings</title>
+    <link rel="stylesheet" href="../styles/tokens.css" />
     <link rel="stylesheet" href="./options.css" />
   </head>
   <body>
     <div class="container">
       <header>
         <h1>ProjectPulse Settings</h1>
-        <p class="subtitle">Configure your progress tracking preferences</p>
+        <button type="button" class="theme-toggle" id="theme-toggle" title="Toggle theme">◐</button>
       </header>
-
+      <p class="redirect-note">
+        Full settings are available in the <a href="#" id="open-dashboard">Dashboard</a>.
+      </p>
       <section class="card">
         <h2>Privacy</h2>
         <p class="notice">
           All captured activity stays in your browser (chrome.storage.local + IndexedDB).
           Your code and metrics are sent to <strong>Groq</strong> only when you manually
-          trigger an analysis or enable scheduled analysis (coming in a later phase).
+          trigger an analysis or enable scheduled analysis.
         </p>
       </section>
-
-      <section class="card">
-        <h2>Groq API Key</h2>
-        <p class="hint">Required for AI progress summaries (Phase 6).</p>
-        <label for="api-key">API Key</label>
-        <input type="password" id="api-key" placeholder="gsk_..." autocomplete="off" />
-        <div class="actions">
-          <button type="button" id="save-btn">Save</button>
-          <button type="button" id="test-btn" class="secondary">Test Connection</button>
-        </div>
-        <p id="save-status" class="status hidden"></p>
-      </section>
-
-      <section class="card">
-        <h2>Analysis Schedule</h2>
-        <label class="checkbox-label">
-          <input type="checkbox" id="auto-analyze" />
-          Auto-analyze every N captured events
-        </label>
-        <label for="interval">Event interval</label>
-        <input type="number" id="interval" min="1" max="100" value="10" />
-      </section>
     </div>
-
     <script type="module" src="./main.ts"></script>
   </body>
 </html>

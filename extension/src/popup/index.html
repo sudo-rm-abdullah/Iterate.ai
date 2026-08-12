@@ -4,31 +4,83 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ProjectPulse</title>
+    <link rel="stylesheet" href="../styles/tokens.css" />
     <link rel="stylesheet" href="./popup.css" />
   </head>
   <body>
-    <header class="header">
-      <h1>ProjectPulse</h1>
-      <span class="badge" id="event-count">0 events</span>
-    </header>
+    <div id="app">
+      <!-- Landing: no projects -->
+      <div id="view-landing" class="view hidden">
+        <header class="header">
+          <h1>ProjectPulse</h1>
+          <button type="button" class="theme-toggle" id="theme-toggle" title="Toggle theme">◐</button>
+        </header>
+        <main class="landing">
+          <p class="landing-text">Track ML project progress automatically — hyperparameters, metrics, and commits with zero manual logging.</p>
+          <button type="button" class="btn primary full" id="start-tracking-btn">Start Tracking</button>
+        </main>
+      </div>
 
-    <div class="toolbar">
-      <button type="button" id="refresh-btn" title="Refresh">↻</button>
-      <button type="button" id="clear-btn" title="Clear all events">Clear</button>
+      <!-- Onboarding wizard -->
+      <div id="view-wizard" class="view hidden">
+        <header class="header">
+          <h1>New Project</h1>
+          <button type="button" class="theme-toggle" id="theme-toggle-wizard" title="Toggle theme">◐</button>
+        </header>
+        <div class="wizard-progress">
+          <span class="step-dot active" data-step="1"></span>
+          <span class="step-dot" data-step="2"></span>
+          <span class="step-dot" data-step="3"></span>
+        </div>
+
+        <div id="wizard-step-1" class="wizard-step">
+          <label class="label" for="project-name">Project name *</label>
+          <input type="text" id="project-name" class="text-input" placeholder="YOLO Scrap Detection" />
+        </div>
+
+        <div id="wizard-step-2" class="wizard-step hidden">
+          <label class="label" for="project-type">Project type (optional)</label>
+          <input type="text" id="project-type" class="text-input" placeholder="e.g. Computer Vision" />
+          <div class="chips" id="type-chips"></div>
+        </div>
+
+        <div id="wizard-step-3" class="wizard-step hidden">
+          <label class="label">Tabs to record</label>
+          <div id="tab-list" class="tab-list"></div>
+          <label class="toggle-row">
+            <input type="checkbox" id="auto-track" checked />
+            <span>Track any Colab / GitHub tab automatically</span>
+          </label>
+        </div>
+
+        <footer class="wizard-footer">
+          <button type="button" class="btn ghost" id="wizard-back">Back</button>
+          <button type="button" class="btn primary" id="wizard-next">Next</button>
+        </footer>
+      </div>
+
+      <!-- Quick view: has active projects -->
+      <div id="view-quick" class="view hidden">
+        <header class="header">
+          <h1>ProjectPulse</h1>
+          <div class="header-actions">
+            <button type="button" class="theme-toggle" id="theme-toggle-quick" title="Toggle theme">◐</button>
+          </div>
+        </header>
+
+        <div class="quick-actions">
+          <button type="button" class="btn primary" id="dashboard-btn">Dashboard</button>
+          <button type="button" class="btn" id="new-project-btn">+ New Project</button>
+        </div>
+
+        <section class="active-projects" id="active-projects"></section>
+
+        <section class="recent-section">
+          <h2 class="section-title">Recent activity</h2>
+          <div id="recent-events"></div>
+        </section>
+      </div>
     </div>
-
-    <div id="status" class="status hidden"></div>
-
-    <main>
-      <ul id="event-list" class="event-list"></ul>
-      <p id="empty-state" class="empty-state">
-        No activity captured yet. Open a Colab notebook and edit or run cells.
-      </p>
-    </main>
-
-    <footer class="footer">
-      <a href="#" id="options-link">Settings</a>
-    </footer>
 
     <script type="module" src="./main.ts"></script>
   </body>

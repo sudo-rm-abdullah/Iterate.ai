@@ -6,13 +6,30 @@ export type EventType =
   | "output_change"
   | "commit"
   | "error"
-  | "note"
-  | "raw"; // Phase 2: unparsed capture before regex extraction
+  | "note";
+
+export type ProjectStatus = "active" | "ended";
+
+export type ThemePreference = "system" | "light" | "dark";
+
+export interface Project {
+  id: string;
+  name: string;
+  type?: string;
+  status: ProjectStatus;
+  startDate: number;
+  endDate?: number;
+  /** Explicitly assigned tab IDs to track */
+  trackedTabIds: number[];
+  /** Auto-track any Colab/GitHub tab for this project */
+  autoTrackColabGithub: boolean;
+}
 
 export interface PulseEvent {
   id: string;
   timestamp: number;
   source: EventSource;
+  projectId: string;
   project: string;
   eventType: EventType;
   summary: string;
@@ -21,7 +38,6 @@ export interface PulseEvent {
   metricsBefore: Record<string, unknown> | null;
   metricsAfter: Record<string, unknown> | null;
   rawDiffRef: string | null;
-  /** Optional agent summary attached later (Phase 6). */
   agentSummary?: {
     text: string;
     timestamp: number;
@@ -29,22 +45,20 @@ export interface PulseEvent {
 }
 
 export interface ProjectMapping {
-  /** Colab notebook title → custom project name */
   colabNotebooks: Record<string, string>;
-  /** GitHub repo full name → custom project name */
   githubRepos: Record<string, string>;
-  /** Explicit links: notebook title → repo full name */
   linkedProjects: Record<string, string>;
 }
 
 export interface StorageSchema {
   events: PulseEvent[];
-  projects: string[];
+  projectRecords: Project[];
   projectMappings: ProjectMapping;
   settings: {
     groqApiKey: string;
     analysisIntervalEvents: number;
     autoAnalyze: boolean;
+    theme: ThemePreference;
   };
 }
 
@@ -52,6 +66,7 @@ export const DEFAULT_SETTINGS: StorageSchema["settings"] = {
   groqApiKey: "",
   analysisIntervalEvents: 10,
   autoAnalyze: false,
+  theme: "system",
 };
 
 export const DEFAULT_PROJECT_MAPPINGS: ProjectMapping = {
@@ -59,3 +74,13 @@ export const DEFAULT_PROJECT_MAPPINGS: ProjectMapping = {
   githubRepos: {},
   linkedProjects: {},
 };
+
+export const PROJECT_TYPE_SUGGESTIONS = [
+  "Computer Vision",
+  "NLP",
+  "Data Analysis",
+  "Web Dev",
+  "Other",
+] as const;
+
+export const IDLE_GAP_MS = 15 * 60 * 1000;

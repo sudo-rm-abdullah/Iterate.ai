@@ -1,27 +1,4 @@
-:root {
-  --bg: #0f1419;
-  --surface: #1a2332;
-  --border: #2d3a4f;
-  --text: #e7ecf3;
-  --text-muted: #8b9cb3;
-  --accent: #3b82f6;
-  --accent-hover: #2563eb;
-  --success: #22c55e;
-  --error: #ef4444;
-  --radius: 8px;
-  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-}
-
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
 body {
-  font-family: var(--font);
-  background: var(--bg);
-  color: var(--text);
   min-height: 100vh;
   padding: 32px 20px;
 }
@@ -32,26 +9,32 @@ body {
 }
 
 header {
-  margin-bottom: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
 }
 
 header h1 {
   font-size: 24px;
   font-weight: 600;
-  margin-bottom: 6px;
 }
 
-.subtitle {
+.redirect-note {
+  font-size: 13px;
   color: var(--text-muted);
-  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.redirect-note a {
+  color: var(--accent-text);
 }
 
 .card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
   padding: 20px;
-  margin-bottom: 16px;
 }
 
 .card h2 {
@@ -67,99 +50,5 @@ header h1 {
 }
 
 .notice strong {
-  color: var(--text);
-}
-
-.hint {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin-bottom: 10px;
-}
-
-label {
-  display: block;
-  font-size: 12px;
-  color: var(--text-muted);
-  margin-bottom: 6px;
-  margin-top: 12px;
-}
-
-input[type="password"],
-input[type="number"] {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
-  color: var(--text);
-  font-size: 14px;
-}
-
-input[type="password"]:focus,
-input[type="number"]:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--text);
-  margin-top: 0;
-  cursor: pointer;
-}
-
-.actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 14px;
-}
-
-button {
-  padding: 8px 16px;
-  border: none;
-  border-radius: var(--radius);
-  background: var(--accent);
-  color: white;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-button:hover {
-  background: var(--accent-hover);
-}
-
-button.secondary {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text);
-}
-
-button.secondary:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.status {
-  margin-top: 10px;
-  font-size: 12px;
-  padding: 8px 10px;
-  border-radius: var(--radius);
-}
-
-.status.success {
-  background: rgba(34, 197, 94, 0.15);
-  color: var(--success);
-}
-
-.status.error {
-  background: rgba(239, 68, 68, 0.15);
-  color: var(--error);
-}
-
-.status.hidden {
-  display: none;
+  color: var(--text-primary);
 }

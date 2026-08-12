@@ -1,68 +1,47 @@
 # ProjectPulse Chrome Extension
 
-Automatically tracks your ML/data-science project progress across **Google Colab** and **GitHub** with zero manual logging. Uses a Groq LLM agent (Llama models) for progress summaries and next-step suggestions.
+Automatically tracks ML/data-science project progress across **Google Colab** and **GitHub** with zero manual logging.
 
-## Current status: Phase 1 & 2
+## v0.2 — Onboarding + Dashboard
 
-- Extension scaffold (Manifest V3, service worker, popup, options)
-- Colab content script: notebook detection, cell edit diffing, output capture
-- Flat event list in popup
-- Local storage via `chrome.storage.local` + IndexedDB for blobs
+- **Onboarding wizard** — project name, type, tab selection, auto-track toggle
+- **Full dashboard** — per-project timeline, idle-aware tracked hours, filters, export
+- **Design system** — dark/light themes, retro terminal badges, JetBrains Mono for data
+- **Smart capture** — only hyperparameter changes and metric/error outputs (no keystroke noise)
+
+## Load in Chrome
+
+```bash
+cd extension
+npm install
+npm run build
+```
+
+1. Open `chrome://extensions` → Developer mode → **Load unpacked** → `extension/dist`
+2. Click the extension icon → **Start Tracking** to run the onboarding wizard
+3. Open **Dashboard** for the full project view
 
 ## File structure
 
 ```
-extension/
-├── package.json
-├── tsconfig.json
-├── vite.config.ts
-├── public/
-│   └── icons/                  # Extension icons (16, 48, 128)
-└── src/
-    ├── manifest.json           # Manifest V3 entry point
-    ├── background/
-    │   └── service-worker.ts   # Event ingestion, blob storage
-    ├── content/
-    │   └── colab.ts            # Colab DOM observer
-    ├── lib/
-    │   ├── types.ts            # Shared data model
-    │   ├── storage.ts          # chrome.storage + IndexedDB
-    │   └── uuid.ts
-    ├── popup/
-    │   ├── index.html
-    │   ├── main.ts             # Flat event list UI
-    │   └── popup.css
-    └── options/
-        ├── index.html
-        ├── main.ts             # API key + privacy notice
-        └── options.css
+extension/src/
+├── manifest.json
+├── background/service-worker.ts
+├── content/colab.ts
+├── lib/
+│   ├── types.ts, storage.ts, extract.ts, time.ts, theme.ts
+│   └── event-render.ts, dom.ts, uuid.ts
+├── styles/tokens.css          # Design system
+├── popup/                     # Wizard + quick view
+├── dashboard/                 # Full tab dashboard
+└── options/                   # Privacy notice + dashboard link
 ```
-
-## Load in Chrome (unpacked)
-
-1. `cd extension && npm install && npm run build`
-2. Open `chrome://extensions`
-3. Enable **Developer mode**
-4. Click **Load unpacked** → select the `extension/dist` folder
-5. Open a Colab notebook, edit a cell, run it — events appear in the popup
-
-## Permissions
-
-| Permission | Why |
-|---|---|
-| `storage` | Local event timeline |
-| `activeTab` | Current tab context |
-| `colab.research.google.com` | Notebook activity capture |
-| `github.com` | Commit/PR capture (Phase 4) |
-| `api.groq.com` | LLM analysis (Phase 6) |
 
 ## Roadmap
 
-- [x] Phase 1: Scaffold
-- [x] Phase 2: Colab raw capture + flat list
-- [ ] Phase 3: Regex param/metric extraction
+- [x] Phase 1–2: Scaffold + Colab capture
+- [x] Onboarding wizard + dashboard redesign
+- [x] Param/metric-only tracking
 - [ ] Phase 4: GitHub content script
-- [ ] Phase 5: Timeline UI with filters
 - [ ] Phase 6: Groq agent integration
-- [ ] Phase 7: Export Markdown/JSON
 - [ ] Phase 8: Manual notes, project renaming/merging

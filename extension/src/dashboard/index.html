@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ProjectPulse Dashboard</title>
+    <link rel="stylesheet" href="../styles/tokens.css" />
+    <link rel="stylesheet" href="./dashboard.css" />
+  </head>
+  <body>
+    <div class="dashboard">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <h1>ProjectPulse</h1>
+          <button type="button" class="theme-toggle" id="theme-toggle" title="Toggle theme">◐</button>
+        </div>
+        <nav id="project-nav" class="project-nav"></nav>
+        <button type="button" class="btn full new-project-btn" id="new-project-sidebar">+ New Project</button>
+      </aside>
+
+      <main class="main">
+        <div id="empty-dashboard" class="empty-dashboard hidden">
+          <h2>No projects yet</h2>
+          <p>Open the extension popup and click <strong>Start Tracking</strong> to create your first project.</p>
+        </div>
+
+        <div id="project-view" class="project-view hidden">
+          <header class="project-header">
+            <div>
+              <h2 id="project-title">—</h2>
+              <p class="project-meta" id="project-meta"></p>
+            </div>
+            <div class="project-header-actions">
+              <button type="button" class="btn" id="export-json-btn">Export JSON</button>
+              <button type="button" class="btn" id="export-md-btn">Export Markdown</button>
+              <button type="button" class="btn" id="end-project-btn">End Project</button>
+            </div>
+          </header>
+
+          <section class="stats-row">
+            <div class="stat-card">
+              <span class="stat-label">Status</span>
+              <span id="stat-status" class="stat-value"></span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Started</span>
+              <span id="stat-start" class="stat-value mono"></span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Ended</span>
+              <span id="stat-end" class="stat-value mono"></span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Time tracked</span>
+              <span id="stat-hours" class="stat-value mono"></span>
+            </div>
+          </section>
+
+          <section class="filters">
+            <select id="filter-type" class="input filter-select">
+              <option value="">All event types</option>
+              <option value="param_change">Param changes</option>
+              <option value="output_change">Output changes</option>
+              <option value="error">Errors</option>
+              <option value="commit">Commits</option>
+              <option value="note">Notes</option>
+            </select>
+            <input type="date" id="filter-from" class="input filter-date" />
+            <input type="date" id="filter-to" class="input filter-date" />
+          </section>
+
+          <section class="timeline-section">
+            <h3 class="section-heading">Timeline</h3>
+            <div id="timeline" class="timeline"></div>
+          </section>
+        </div>
+
+        <section id="settings-panel" class="settings-panel">
+          <h3 class="section-heading">Settings</h3>
+          <div class="settings-grid">
+            <div class="settings-card">
+              <label class="label" for="groq-key">Groq API Key</label>
+              <input type="password" id="groq-key" class="text-input" placeholder="gsk_..." />
+              <div class="settings-actions">
+                <button type="button" class="btn primary" id="save-settings">Save</button>
+                <button type="button" class="btn" id="test-groq">Test</button>
+              </div>
+              <p id="settings-status" class="settings-status hidden"></p>
+              <p class="hint">Your code/data is sent to Groq only when you trigger or schedule an analysis.</p>
+            </div>
+            <div class="settings-card">
+              <label class="label">Tracked domains</label>
+              <p class="hint mono">colab.research.google.com, github.com</p>
+              <label class="label" style="margin-top:12px">Theme</label>
+              <select id="theme-select" class="input">
+                <option value="system">System</option>
+                <option value="dark">Dark</option>
+                <option value="light">Light</option>
+              </select>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

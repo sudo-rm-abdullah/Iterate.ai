@@ -6,6 +6,7 @@ export default defineConfig({
     webExtension({
       manifest: "src/manifest.json",
       disableAutoRegister: true,
+      additionalInputs: ["src/dashboard/index.html"],
       webExtConfig: {
         startUrl: ["https://colab.research.google.com"],
       },
